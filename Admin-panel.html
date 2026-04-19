@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Smart Waste Monitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #151c2c;
+      --green: #2ed573;
+      --red: #ff4757;
+      --blue: #3498db;
+      --orange: #ff9f43;
+      --muted: #8b9bb4;
+      --border: rgba(255,255,255,0.06);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Inter',sans-serif; }
+    body { background:var(--bg); color:#fff; min-height:100vh; }
+
+    /* LOGIN SCREEN */
+    #login-screen {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: var(--bg); z-index: 9999;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px;
+    }
+    .login-logo { font-size: 50px; color: var(--blue); margin-bottom: 10px; }
+    .login-title { font-size: 22px; font-weight: 700; margin-bottom: 5px; }
+    .login-sub { font-size: 13px; color: var(--muted); margin-bottom: 30px; }
+    .login-box { width: 100%; max-width: 360px; background: var(--card); border-radius: 20px; padding: 25px; border: 1px solid var(--border); }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+    .form-group input {
+      width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+      color: #fff; padding: 13px 15px; border-radius: 10px; font-size: 14px; outline: none; transition: border 0.2s;
+    }
+    .form-group input:focus { border-color: var(--blue); }
+    .btn { width:100%; padding:14px; border:none; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-blue { background: linear-gradient(135deg, #3498db, #2980b9); color:#fff; }
+    .btn-red { background: rgba(255,71,87,0.15); border: 1px solid var(--red); color: var(--red); }
+    .btn-green { background: linear-gradient(135deg, #2ed573, #1e9e52); color:#fff; }
+    .btn-orange { background: linear-gradient(135deg, #ff9f43, #e08a2a); color:#fff; }
+    .error-msg { color: var(--red); font-size: 12px; text-align:center; margin-top:10px; display:none; }
+
+    /* MAIN PANEL */
+    #main-panel { display:none; padding-bottom: 30px; }
+
+    /* Header */
+    .admin-header {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top:0; z-index:100;
+    }
+    .admin-header h2 { font-size: 16px; display:flex; align-items:center; gap:8px; }
+    .admin-header h2 i { color: var(--blue); }
+    .logout-btn { background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); color: var(--red); padding: 8px 14px; border-radius:8px; font-size:12px; cursor:pointer; font-weight:600; }
+
+    /* Live Status Bar */
+    .status-bar { display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding:15px; }
+    .status-card { background:var(--card); border-radius:14px; padding:15px; border:1px solid var(--border); }
+    .status-card .s-label { font-size:11px; color:var(--muted); margin-bottom:5px; }
+    .status-card .s-val { font-size:26px; font-weight:700; }
+    .status-card .s-sub { font-size:11px; margin-top:3px; }
+    .status-card.bin1 .s-val { color: var(--red); }
+    .status-card.bin2 .s-val { color: var(--green); }
+
+    /* Section */
+    .section { margin: 0 15px 15px; background: var(--card); border-radius:16px; border:1px solid var(--border); overflow:hidden; }
+    .section-header { padding: 15px; border-bottom: 1px solid var(--border); display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; }
+    .section-header i { width:20px; text-align:center; }
+    .section-body { padding: 15px; }
+
+    input[type=number], input[type=text], input[type=password], textarea, select {
+      width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border);
+      color:#fff; padding:12px 14px; border-radius:10px; font-size:13px; outline:none; transition:border 0.2s;
+    }
+    input:focus, textarea:focus, select:focus { border-color: var(--blue); }
+    textarea { resize:none; height:70px; }
+    select option { background: #1a2035; }
+
+    .row { display:flex; gap:10px; margin-bottom:10px; }
+    .row input { flex:1; margin-bottom:0; }
+
+    .status-pill { display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:4px 10px; border-radius:20px; margin-top:8px; }
+    .pill-green { background:rgba(46,213,115,0.1); color:var(--green); border:1px solid rgba(46,213,115,0.2); }
+    .pill-red { background:rgba(255,71,87,0.1); color:var(--red); border:1px solid rgba(255,71,87,0.2); }
+
+    /* Range Slider */
+    .range-wrap { position:relative; margin: 10px 0; }
+    input[type=range] {
+      width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:10px;
+      outline:none; border:none; padding:0; cursor:pointer; appearance:none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      appearance:none; width:20px; height:20px; border-radius:50%;
+      background:var(--blue); cursor:pointer; box-shadow:0 0 8px rgba(52,152,219,0.5);
+    }
+    .range-val { text-align:center; font-size:22px; font-weight:700; color:var(--blue); margin-bottom:5px; }
+
+    /* History List */
+    .hist-item { display:flex; align-items:center; justify-content:space-between; padding:12px; background:rgba(255,255,255,0.03); border-radius:10px; margin-bottom:8px; border:1px solid var(--border); }
+    .hist-item-info h4 { font-size:13px; margin-bottom:2px; }
+    .hist-item-info p { font-size:11px; color:var(--muted); }
+    .del-btn { background:rgba(255,71,87,0.1); border:1px solid rgba(255,71,87,0.2); color:var(--red); width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:13px; flex-shrink:0; }
+
+    /* Truck Cards */
+    .truck-card { background:rgba(255,159,67,0.06); border:1px solid rgba(255,159,67,0.2); border-radius:12px; padding:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+    .truck-card-info h4 { font-size:13px; color: var(--orange); margin-bottom:3px; }
+    .truck-card-info p { font-size:11px; color:var(--muted); }
+
+    /* Toast */
+    #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); padding:12px 20px; border-radius:20px; font-size:13px; z-index:9999; display:none; backdrop-filter:blur(10px); }
+  </style>
+</head>
+<body>
+
+<!-- ========== LOGIN SCREEN ========== -->
+<div id="login-screen">
+  <div class="login-logo"><i class="fa-solid fa-user-shield"></i></div>
+  <div class="login-title">Admin Panel</div>
+  <div class="login-sub">Smart Waste Monitor — Secure Access</div>
+  <div class="login-box">
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="l-user" placeholder="Enter username" onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="l-pass" placeholder="Enter password" onkeydown="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn btn-blue" onclick="doLogin()"><i class="fa-solid fa-right-to-bracket"></i> Login</button>
+    <div class="error-msg" id="l-err">Invalid credentials!</div>
+    <p style="font-size:11px; color:var(--muted); text-align:center; margin-top:12px;"></p>
+  </div>
+</div>
+
+<!-- ========== MAIN ADMIN PANEL ========== -->
+<div id="main-panel">
+
+  <!-- Header -->
+  <div class="admin-header">
+    <h2><i class="fa-solid fa-user-shield"></i> Admin Panel</h2>
+    <button class="logout-btn" onclick="doLogout()"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+  </div>
+
+  <!-- Live Bin Status -->
+  <div class="status-bar">
+    <div class="status-card bin1">
+      <div class="s-label"><i class="fa-solid fa-trash-can" style="color:var(--red);"></i> Bin 1</div>
+      <div class="s-val" id="live-lvl1">--</div>
+      <div class="s-sub" id="live-sub1" style="color:var(--muted);">Loading...</div>
+    </div>
+    <div class="status-card bin2">
+      <div class="s-label"><i class="fa-solid fa-trash-can" style="color:var(--green);"></i> Bin 2</div>
+      <div class="s-val" id="live-lvl2">--</div>
+      <div class="s-sub" id="live-sub2" style="color:var(--muted);">Loading...</div>
+    </div>
+  </div>
+
+  <!-- BIN LEVEL CONTROL -->
+  <div class="section">
+    <div class="section-header" style="color:var(--red);"><i class="fa-solid fa-sliders"></i> Bin Level Control</div>
+    <div class="section-body">
+
+      <!-- Bin 1 -->
+      <div style="margin-bottom:20px;">
+        <label style="font-size:12px; color:var(--muted);">Bin 1 Level</label>
+        <div class="range-val" id="range1-val">85%</div>
+        <input type="range" id="range1" min="0" max="100" value="85" oninput="document.getElementById('range1-val').textContent=this.value+'%'">
+        <button class="btn btn-red" style="margin-top:10px;" onclick="adminSetLevel(1)">
+          <i class="fa-solid fa-check"></i> Set Bin 1 Level
+        </button>
+      </div>
+
+      <!-- Bin 2 -->
+      <div>
+        <label style="font-size:12px; color:var(--muted);">Bin 2 Level</label>
+        <div class="range-val" id="range2-val" style="color:var(--green);">42%</div>
+        <input type="range" id="range2" min="0" max="100" value="42" oninput="document.getElementById('range2-val').textContent=this.value+'%'">
+        <button class="btn btn-green" style="margin-top:10px;" onclick="adminSetLevel(2)">
+          <i class="fa-solid fa-check"></i> Set Bin 2 Level
+        </button>
+      </div>
+
+      <div id="level-status" style="display:none; margin-top:10px;" class="status-pill pill-green"></div>
+    </div>
+  </div>
+
+  <!-- SEND NOTIFICATION -->
+  <div class="section">
+    <div class="section-header" style="color:var(--blue);"><i class="fa-regular fa-bell"></i> Send Notification</div>
+    <div class="section-body">
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Title</label>
+        <input type="text" id="noti-title" placeholder="Alert title...">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Message</label>
+        <textarea id="noti-msg" placeholder="Notification message..."></textarea>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Type</label>
+        <select id="noti-type">
+          <option value="normal">Normal</option>
+          <option value="warning">Warning / Alert</option>
+        </select>
+      </div>
+      <button class="btn btn-blue" onclick="adminSendNotification()">
+        <i class="fa-solid fa-paper-plane"></i> Send Notification
+      </button>
+      <div id="noti-status" style="display:none; margin-top:10px;" class="status-pill pill-green"></div>
+    </div>
+  </div>
+
+  <!-- COLLECTION HISTORY -->
+  <div class="section">
+    <div class="section-header" style="color:var(--green);"><i class="fa-solid fa-clock-rotate-left"></i> Collection History</div>
+    <div class="section-body">
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Event Title</label>
+        <input type="text" id="hist-title" placeholder="e.g. Bin 1 Emptied">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Description</label>
+        <input type="text" id="hist-desc" placeholder="e.g. By Truck MH-12">
+      </div>
+      <button class="btn btn-green" onclick="adminAddHistory()">
+        <i class="fa-solid fa-plus"></i> Add to History
+      </button>
+      <div id="hist-status" style="display:none; margin-top:10px;" class="status-pill pill-green"></div>
+
+      <!-- History List -->
+      <div id="hist-list" style="margin-top:15px;"></div>
+    </div>
+  </div>
+
+  <!-- TRUCK / DRIVER MANAGEMENT -->
+  <div class="section">
+    <div class="section-header" style="color:var(--orange);"><i class="fa-solid fa-truck"></i> Truck / Driver Management</div>
+    <div class="section-body">
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Driver Name</label>
+        <input type="text" id="driver-name" placeholder="e.g. Ramesh Kumar">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Truck Number</label>
+        <input type="text" id="truck-no" placeholder="e.g. MH-12-AB-1234">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px; color:var(--muted); display:block; margin-bottom:6px;">Assign To</label>
+        <select id="assign-bin">
+          <option value="Bin 1 - PRMCEM">Bin 1 - PRMCEM</option>
+          <option value="Bin 2 - PRMITR">Bin 2 - PRMITR</option>
+          <option value="Both Bins">Both Bins</option>
+        </select>
+      </div>
+      <button class="btn btn-orange" onclick="adminAssignTruck()">
+        <i class="fa-solid fa-truck"></i> Assign Truck
+      </button>
+      <div id="truck-status" style="display:none; margin-top:10px;" class="status-pill pill-green"></div>
+
+      <!-- Truck List -->
+      <div id="truck-list" style="margin-top:15px;"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+  // ========== FIREBASE ==========
+  var firebaseConfig = {
+    apiKey: "AIzaSyAE-UHAZUn2lcGVpmG1j9bGOvndnji88gA",
+    authDomain: "trashiq-90c6e.firebaseapp.com",
+    databaseURL: "https://trashiq-90c6e-default-rtdb.firebaseio.com",
+    projectId: "trashiq-90c6e"
+  };
+  if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+  var db = firebase.database();
+
+  // ========== LOGIN ==========
+  function doLogin() {
+    const user = document.getElementById('l-user').value.trim();
+    const pass = document.getElementById('l-pass').value.trim();
+    const err = document.getElementById('l-err');
+    if(user === 'admin' && pass === 'admin123') {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('main-panel').style.display = 'block';
+      loadData();
+      err.style.display = 'none';
+    } else {
+      err.style.display = 'block';
+    }
+  }
+
+  function doLogout() {
+    document.getElementById('main-panel').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('l-user').value = '';
+    document.getElementById('l-pass').value = '';
+  }
+
+  // ========== LOAD LIVE DATA ==========
+  function loadData() {
+    // Live bin levels
+    db.ref("bins/bin1/level").on("value", s => {
+      const val = s.val() || 0;
+      document.getElementById('live-lvl1').textContent = val + '%';
+      document.getElementById('range1').value = val;
+      document.getElementById('range1-val').textContent = val + '%';
+      const sub = document.getElementById('live-sub1');
+      sub.textContent = val >= 80 ? '⚠ Almost Full' : val >= 50 ? 'Moderate' : 'Normal';
+      sub.style.color = val >= 80 ? 'var(--red)' : val >= 50 ? 'var(--orange)' : 'var(--green)';
+    });
+
+    db.ref("bins/bin2/level").on("value", s => {
+      const val = s.val() || 0;
+      document.getElementById('live-lvl2').textContent = val + '%';
+      document.getElementById('range2').value = val;
+      document.getElementById('range2-val').textContent = val + '%';
+      const sub = document.getElementById('live-sub2');
+      sub.textContent = val >= 80 ? '⚠ Almost Full' : val >= 50 ? 'Moderate' : 'Normal';
+      sub.style.color = val >= 80 ? 'var(--red)' : val >= 50 ? 'var(--orange)' : 'var(--green)';
+    });
+
+    // Load History
+    db.ref("history").limitToLast(20).on("value", s => {
+      const list = document.getElementById('hist-list');
+      list.innerHTML = '';
+      if(s.val()) {
+        const items = s.val();
+        Object.entries(items).reverse().forEach(([key, val]) => {
+          const div = document.createElement('div');
+          div.className = 'hist-item';
+          div.innerHTML = `
+            <div class="hist-item-info">
+              <h4>${val.title || 'Event'}</h4>
+              <p>${val.description || ''} · ${new Date(val.timestamp || Date.now()).toLocaleString()}</p>
+            </div>
+            <button class="del-btn" onclick="deleteHistory('${key}')"><i class="fa-solid fa-trash"></i></button>`;
+          list.appendChild(div);
+        });
+      } else {
+        list.innerHTML = '<p style="color:var(--muted); font-size:13px; text-align:center;">Koi history nahi hai</p>';
+      }
+    });
+
+    // Load Trucks
+    db.ref("trucks").limitToLast(10).on("value", s => {
+      const list = document.getElementById('truck-list');
+      list.innerHTML = '';
+      if(s.val()) {
+        const items = s.val();
+        Object.entries(items).reverse().forEach(([key, val]) => {
+          const div = document.createElement('div');
+          div.className = 'truck-card';
+          div.innerHTML = `
+            <div class="truck-card-info">
+              <h4><i class="fa-solid fa-truck"></i> ${val.truck}</h4>
+              <p>Driver: ${val.driver} · ${val.bin} · ${new Date(val.timestamp || Date.now()).toLocaleTimeString()}</p>
+            </div>
+            <button class="del-btn" onclick="deleteTruck('${key}')"><i class="fa-solid fa-trash"></i></button>`;
+          list.appendChild(div);
+        });
+      }
+    });
+  }
+
+  // ========== ADMIN FUNCTIONS ==========
+  function adminSetLevel(binId) {
+    const val = parseInt(document.getElementById(`range${binId}`).value);
+    db.ref(`bins/bin${binId}/level`).set(val);
+    showStatus('level-status', `✓ Bin ${binId} level ${val}% set ho gaya!`, true);
+    showToast(`Bin ${binId} → ${val}%`);
+  }
+
+  function adminSendNotification() {
+    const title = document.getElementById('noti-title').value.trim();
+    const msg = document.getElementById('noti-msg').value.trim();
+    const type = document.getElementById('noti-type').value;
+    if(!title || !msg) { showToast('Title aur message bharo!', true); return; }
+    db.ref("notifications").push({ title, message: msg, type, timestamp: Date.now() });
+    document.getElementById('noti-title').value = '';
+    document.getElementById('noti-msg').value = '';
+    showStatus('noti-status', '✓ Notification send ho gayi!', true);
+    showToast('Notification sent!');
+  }
+
+  function adminAddHistory() {
+    const title = document.getElementById('hist-title').value.trim();
+    const desc = document.getElementById('hist-desc').value.trim();
+    if(!title) { showToast('Title bharo!', true); return; }
+    db.ref("history").push({ title, description: desc, timestamp: Date.now() });
+    document.getElementById('hist-title').value = '';
+    document.getElementById('hist-desc').value = '';
+    showStatus('hist-status', '✓ History mein add ho gaya!', true);
+  }
+
+  function deleteHistory(key) {
+    if(confirm('Yeh history delete karna chahte ho?')) {
+      db.ref(`history/${key}`).remove();
+      showToast('History deleted!');
+    }
+  }
+
+  function adminAssignTruck() {
+    const driver = document.getElementById('driver-name').value.trim();
+    const truck = document.getElementById('truck-no').value.trim();
+    const bin = document.getElementById('assign-bin').value;
+    if(!driver || !truck) { showToast('Driver aur Truck number bharo!', true); return; }
+    db.ref("trucks").push({ driver, truck, bin, timestamp: Date.now() });
+    document.getElementById('driver-name').value = '';
+    document.getElementById('truck-no').value = '';
+    showStatus('truck-status', `✓ ${truck} assigned!`, true);
+    showToast(`${truck} assigned to ${bin}`);
+  }
+
+  function deleteTruck(key) {
+    if(confirm('Yeh truck record delete karna chahte ho?')) {
+      db.ref(`trucks/${key}`).remove();
+      showToast('Truck record deleted!');
+    }
+  }
+
+  // ========== HELPERS ==========
+  function showStatus(id, msg, success) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = 'status-pill ' + (success ? 'pill-green' : 'pill-red');
+    el.style.display = 'inline-flex';
+    setTimeout(() => el.style.display = 'none', 3000);
+  }
+
+  function showToast(msg, isError) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = isError ? 'rgba(255,71,87,0.9)' : 'rgba(46,213,115,0.9)';
+    t.style.color = '#fff';
+    t.style.display = 'block';
+    t.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
+    setTimeout(() => t.style.display = 'none', 2500);
+  }
+</script>
+<div style="text-align:center; padding:15px; font-size:12px; color:#8b9bb4; margin-bottom:80px;">
+  Made with ❤️ by <span style="color:#3498db; font-weight:600;">Sanket</span>
+</div>
+</body>
+</html>
