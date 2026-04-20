@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Waste Monitor</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: #151c2c;
+      --primary-green: #2ed573;
+      --primary-red: #ff4757;
+      --text-main: #ffffff;
+      --text-muted: #8b9bb4;
+      --border-color: rgba(255, 255, 255, 0.05);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    
+    body { background-color: var(--bg-color); color: var(--text-main); padding-bottom: 80px; }
+
+    /* Header */
+    .header { display: flex; justify-content: space-between; align-items: center; padding: 20px; }
+    .logo-area { display: flex; align-items: center; gap: 10px; }
+    .logo-area i { color: #3498db; font-size: 24px; }
+    .title-text h2 { font-size: 18px; font-weight: 600; }
+    .status { color: var(--primary-green); font-size: 12px; display: flex; align-items: center; gap: 5px; }
+    .status::before { content: ""; display: block; width: 6px; height: 6px; background: var(--primary-green); border-radius: 50%; box-shadow: 0 0 8px var(--primary-green); }
+    .header-icons { display: flex; gap: 20px; font-size: 20px; color: var(--text-muted); cursor: pointer;}
+
+    /* Hero Section */
+    .hero { padding: 0 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .hero-text h1 { font-size: 24px; font-weight: 700; color: #7bed9f; }
+    .hero-text p { color: var(--text-muted); font-size: 14px; margin-top: 5px; }
+    .hero-icon { font-size: 60px; color: var(--primary-green); text-shadow: 0 0 20px rgba(46, 213, 115, 0.4); }
+
+    /* Grid Cards */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 0 20px; }
+    .card { background: var(--card-bg); border-radius: 20px; padding: 15px; border: 1px solid var(--border-color); position: relative; overflow: hidden; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .card:active { transform: scale(0.97); }
+    .card:hover { box-shadow: 0 0 20px rgba(52,152,219,0.15); }
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .bin-icon { padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); }
+    .card.red .bin-icon i { color: var(--primary-red); }
+    .card.green .bin-icon i { color: var(--primary-green); }
+    
+    .bin-info h3 { font-size: 16px; margin-bottom: 5px; }
+    .badge { padding: 4px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+    .badge.red { background: rgba(255, 71, 87, 0.1); color: var(--primary-red); }
+    .badge.green { background: rgba(46, 213, 115, 0.1); color: var(--primary-green); }
+
+    /* Circular Progress */
+    .circle-wrap { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 20px; }
+    .circular-chart { display: block; margin: 0 auto; max-width: 80%; max-height: 250px; }
+    .circle-bg { fill: none; stroke: rgba(255, 255, 255, 0.05); stroke-width: 3.8; }
+    .circle { fill: none; stroke-width: 2.8; stroke-linecap: round; transition: stroke-dasharray 1s ease-out; }
+    .card.red .circle { stroke: var(--primary-red); filter: drop-shadow(0 0 4px var(--primary-red)); }
+    .card.green .circle { stroke: var(--primary-green); filter: drop-shadow(0 0 4px var(--primary-green)); }
+    .percentage { fill: #fff; font-family: 'Inter'; font-size: 8px; font-weight: bold; text-anchor: middle; }
+    .sub-percentage { fill: var(--text-muted); font-size: 4px; text-anchor: middle; }
+
+    .level-info { width: 100%; text-align: left; }
+    .level-info h4 { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+    .level-info h2 { font-size: 24px; margin: 5px 0; }
+    .card.red .level-info h2 { color: var(--primary-red); }
+    .card.green .level-info h2 { color: var(--primary-green); }
+    
+    .warning-label { font-size: 11px; color: var(--primary-red); background: rgba(255, 71, 87, 0.1); padding: 5px 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid rgba(255,71,87,0.2); }
+    .progress-bar-bg { width: 100%; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; margin-top: 10px; }
+    .progress-bar-fill { height: 100%; background: var(--primary-green); border-radius: 10px; width: 42%; box-shadow: 0 0 10px var(--primary-green); transition: width 1s ease; }
+
+    /* Stats Row */
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; padding: 20px; }
+    .stat-box { background: var(--card-bg); border-radius: 16px; padding: 15px; display: flex; align-items: center; gap: 10px; border: 1px solid var(--border-color); }
+    .stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 18px; }
+    .stat-box:nth-child(1) .stat-icon { background: rgba(46, 213, 115, 0.1); color: var(--primary-green); }
+    .stat-box:nth-child(2) .stat-icon { background: rgba(255, 159, 67, 0.1); color: #ff9f43; }
+    .stat-box:nth-child(3) .stat-icon { background: rgba(52, 152, 219, 0.1); color: #3498db; }
+    .stat-details p { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+    .stat-details h3 { font-size: 18px; }
+    .stat-box:nth-child(2) h3 { color: #ff9f43; }
+    .stat-box:nth-child(3) h3 { color: #3498db; }
+
+    /* Chart Section */
+    .chart-container { background: var(--card-bg); border-radius: 20px; margin: 0 20px; padding: 20px; border: 1px solid var(--border-color); }
+    .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .chart-header h3 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .chart-header h3 i { color: #3498db; }
+    .dropdown { background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 5px 10px; border-radius: 8px; font-size: 12px; }
+
+    /* Bottom Navigation */
+    .bottom-nav { position: fixed; bottom: 0; width: 100%; background: var(--card-bg); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 15px 0; z-index: 1000; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 5px; color: var(--text-muted); font-size: 12px; cursor: pointer; transition: 0.3s; }
+    .nav-item i { font-size: 20px; }
+    .nav-item.active { color: #3498db; }
+    .nav-item.active::after { content: ''; width: 20px; height: 3px; background: #3498db; border-radius: 5px; margin-top: 2px; }
+
+    /* Pages (History & Settings) CSS */
+    .page-section { position: absolute; top: 70px; left: 0; width: 100%; height: calc(100vh - 150px); background: var(--bg-color); z-index: 500; padding: 20px; overflow-y: auto; display: none; }
+    .page-section h2 { font-size: 20px; margin-bottom: 20px; color: #fff; }
+
+    /* Settings Items */
+    .settings-group { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 15px; margin-bottom: 20px; padding: 10px; }
+    .settings-group h3 { font-size: 12px; color: var(--text-muted); text-transform: uppercase; margin: 10px; font-weight: 600; }
+    .settings-item { display: flex; align-items: center; gap: 15px; padding: 15px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); color: #fff; font-size: 14px; cursor: pointer; }
+    .settings-item:last-child { border-bottom: none; }
+    .settings-item i:first-child { color: #3498db; width: 20px; text-align: center; }
+    .settings-item span { flex: 1; }
+
+    /* History Cards */
+    .history-card { display: flex; align-items: center; gap: 15px; background: var(--card-bg); padding: 15px; border-radius: 15px; margin-bottom: 10px; border: 1px solid var(--border-color); }
+    .hist-icon { width: 40px; height: 40px; background: rgba(52, 152, 219, 0.1); color: #3498db; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+    .hist-info h4 { font-size: 14px; margin-bottom: 3px; }
+    .hist-info p { font-size: 11px; color: var(--text-muted); }
+
+    /* Modal/Notifications */
+    .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+    .modal-content { background: var(--card-bg); width: 90%; border-radius: 20px; border: 1px solid var(--border-color); max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
+    .modal-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { font-size: 16px; color: #fff; }
+    .close-btn { color: var(--text-muted); font-size: 20px; cursor: pointer; }
+    .noti-list { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .noti-item { padding: 12px; border-radius: 10px; font-size: 12px; background: rgba(255,255,255,0.05); border-left: 4px solid var(--primary-green); }
+    .noti-item.warning { border-left-color: var(--primary-red); background: rgba(255,71,87,0.1); color: #fff; }
+
+    /* Toggle Switch */
+    .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); border-radius: 20px; transition: .4s; }
+    .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: var(--text-muted); border-radius: 50%; transition: .4s; }
+    input:checked + .slider { background-color: var(--primary-green); }
+    input:checked + .slider:before { transform: translateX(20px); background-color: white; }
+
+    /* ============ NEW ADDITIONS BELOW ============ */
+
+    /* Bin Detail Modal */
+    .bin-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; }
+    .bin-detail-stat { background: rgba(255,255,255,0.04); border-radius: 12px; padding: 12px; border: 1px solid var(--border-color); }
+    .bin-detail-stat .label { font-size: 10px; color: var(--text-muted); margin-bottom: 5px; }
+    .bin-detail-stat .value { font-size: 16px; font-weight: 600; }
+    .bin-detail-stat.full-width { grid-column: 1 / -1; }
+    .bin-detail-map { padding: 0 15px 15px; }
+    .map-placeholder { background: rgba(52,152,219,0.08); border: 1px solid rgba(52,152,219,0.2); border-radius: 12px; padding: 20px; text-align: center; color: #3498db; font-size: 13px; }
+    .map-placeholder i { font-size: 30px; margin-bottom: 8px; display: block; }
+    .map-coords { font-size: 10px; color: var(--text-muted); margin-top: 5px; }
+
+    /* Live GPS pulse animation */
+    @keyframes gpsPulse {
+      0% { box-shadow: 0 0 0 0 rgba(46,213,115,0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(46,213,115,0); }
+      100% { box-shadow: 0 0 0 0 rgba(46,213,115,0); }
+    }
+    .gps-dot { display: inline-block; width: 8px; height: 8px; background: var(--primary-green); border-radius: 50%; animation: gpsPulse 1.5s infinite; margin-right: 5px; }
+    .gps-dot.red { background: var(--primary-red); animation: none; box-shadow: 0 0 6px var(--primary-red); }
+
+    /* Status Badge in detail */
+    .status-badge-full { display: flex; align-items: center; gap: 8px; padding: 10px 15px; border-radius: 10px; font-size: 13px; font-weight: 500; }
+    .status-badge-full.full { background: rgba(255,71,87,0.1); color: var(--primary-red); border: 1px solid rgba(255,71,87,0.2); }
+    .status-badge-full.normal { background: rgba(46,213,115,0.1); color: var(--primary-green); border: 1px solid rgba(46,213,115,0.2); }
+
+    /* Login Modal Form */
+    .form-group { margin-bottom: 15px; }
+    .form-group label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 6px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color);
+      color: #fff; padding: 12px 15px; border-radius: 10px; font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: #3498db; }
+    .form-group textarea { resize: none; height: 80px; }
+    .btn-submit { width: 100%; background: linear-gradient(135deg, #3498db, #2980b9); color: #fff; border: none;
+      padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    .btn-submit:hover { opacity: 0.85; }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .form-success { color: var(--primary-green); font-size: 13px; text-align: center; padding: 10px; background: rgba(46,213,115,0.1); border-radius: 10px; border: 1px solid rgba(46,213,115,0.2); }
+    .form-error { color: var(--primary-red); font-size: 13px; text-align: center; padding: 10px; background: rgba(255,71,87,0.1); border-radius: 10px; }
+    .modal-body { padding: 20px; overflow-y: auto; max-height: 60vh; }
+
+    /* System Status Page */
+    .system-status-item { display: flex; align-items: center; justify-content: space-between; background: var(--card-bg); padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid var(--border-color); font-size: 14px; }
+    .system-status-item .dot-online { color: var(--primary-green); font-size: 11px; display: flex; align-items: center; gap: 5px; }
+    .system-status-item .dot-online::before { content: ""; display: inline-block; width: 6px; height: 6px; background: var(--primary-green); border-radius: 50%; box-shadow: 0 0 6px var(--primary-green); }
+
+    /* History Empty State */
+    .empty-state { text-align: center; color: var(--text-muted); padding: 40px 20px; }
+    .empty-state i { font-size: 40px; margin-bottom: 10px; display: block; }
+
+    /* Logged-in state */
+    .user-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(52,152,219,0.1); border: 1px solid rgba(52,152,219,0.2); color: #3498db; padding: 8px 12px; border-radius: 10px; font-size: 13px; margin-bottom: 15px; }
+
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo-area">
+      <i class="fa-solid fa-trash-can"></i>
+      <div class="title-text">
+        <h2>Smart Waste Monitor</h2>
+        <div class="status">System Online</div>
+      </div>
+    </div>
+    <div class="header-icons">
+      <i class="fa-solid fa-rotate-right" onclick="location.reload()"></i>
+      <div style="position:relative;" onclick="toggleModal('notification-modal')">
+        <i class="fa-regular fa-bell"></i>
+        <span id="bell-badge" style="position:absolute; top:-2px; right:-2px; background:red; width:8px; height:8px; border-radius:50%;"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="dashboard-page">
+    <div class="hero">
+      <div class="hero-text">
+        <h1>Smart Waste Monitoring</h1>
+        <p>Real-time status of smart bins</p>
+      </div>
+      <div class="hero-icon">
+        <i class="fa-solid fa-dumpster"></i>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- BIN 1 - Clickable -->
+      <div class="card red" onclick="openBinDetail(1)">
+        <div class="card-top">
+          <div class="bin-icon"><i class="fa-solid fa-trash-can"></i></div>
+          <div class="bin-info">
+            <h3>Bin 1</h3>
+            <span class="badge red" id="badge1">Status: Full</span>
+          </div>
+          <i class="fa-solid fa-chevron-right" style="color:var(--text-muted);"></i>
+        </div>
+        <div class="circle-wrap">
+          <svg viewBox="0 0 36 36" class="circular-chart" style="width: 80px; height: 80px;">
+            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path class="circle" id="circle1" stroke-dasharray="85, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <text x="18" y="19" class="percentage" id="perc1">85%</text>
+            <text x="18" y="25" class="sub-percentage" id="subperc1">Full</text>
+          </svg>
+          <div class="level-info">
+            <h4>Level</h4>
+            <h2 id="lvl1">85%</h2>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="bar1" style="width:85%; background:var(--primary-red);"></div>
+            </div>
+            <div class="warning-label" id="warn1" style="margin-top:8px;"><i class="fa-solid fa-triangle-exclamation"></i> Bin almost full</div>
+            
+            <div class="bin-meta" style="margin-top: 15px; font-size: 10px; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 10px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span><i class="fa-solid fa-location-dot" style="color: #ff4757;"></i> <span id="loc1">Fetching...</span></span>
+                <span><i class="fa-regular fa-clock"></i> <span id="time1">--:--</span></span>
+              </div>
+              <div><i class="fa-regular fa-calendar"></i> <span id="date1">--/--/----</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<!-- BIN 2 - Clickable -->
+      <div class="card green" onclick="openBinDetail(2)">
+        <div class="card-top">
+          <div class="bin-icon"><i class="fa-solid fa-trash-can"></i></div>
+          <div class="bin-info">
+            <h3>Bin 2</h3>
+            <span class="badge green" id="badge2">Status: Normal</span>
+          </div>
+          <i class="fa-solid fa-chevron-right" style="color:var(--text-muted);"></i>
+        </div>
+        <div class="circle-wrap">
+          <svg viewBox="0 0 36 36" class="circular-chart" style="width: 80px; height: 80px;">
+            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <path class="circle" id="circle2" stroke-dasharray="42, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            <text x="18" y="19" class="percentage" id="perc2">42%</text>
+            <text x="18" y="25" class="sub-percentage" id="subperc2">Moderate</text>
+          </svg>
+          <div class="level-info" style="width: 100%;">
+            <h4>Level</h4>
+            <h2 id="lvl2">42%</h2>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="bar2"></div>
+            </div>
+
+            <div class="bin-meta" style="margin-top: 15px; font-size: 10px; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 10px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span><i class="fa-solid fa-location-dot" style="color: var(--primary-green);"></i> <span id="loc2">Fetching...</span></span>
+                <span><i class="fa-regular fa-clock"></i> <span id="time2">--:--</span></span>
+              </div>
+              <div><i class="fa-regular fa-calendar"></i> <span id="date2">--/--/----</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-icon"><i class="fa-solid fa-trash-can"></i></div>
+        <div class="stat-details"><p>Total Bins</p><h3>2</h3></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon"><i class="fa-regular fa-bell"></i></div>
+        <div class="stat-details"><p>Alerts</p><h3 id="alert-count">1</h3></div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-icon"><i class="fa-solid fa-arrow-trend-up"></i></div>
+        <div class="stat-details"><p>Avg. Fill</p><h3 id="avg-fill">64%</h3></div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-header">
+        <h3><i class="fa-solid fa-chart-line"></i> Waste Level Over Time</h3>
+        <select class="dropdown"><option>Last 24 Hours</option></select>
+      </div>
+      <div style="height: 200px;">
+        <canvas id="lineChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== NOTIFICATION MODAL ========== -->
+  <div id="notification-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-regular fa-bell"></i> Live Alerts</h3>
+        <i class="fa-solid fa-xmark close-btn" onclick="toggleModal('notification-modal')"></i>
+      </div>
+      <div id="noti-list" class="noti-list">
+        <div class="noti-item">System initialized successfully.</div>
+        <div class="noti-item warning">Bin 1 is nearing maximum capacity! Please schedule a pickup.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== BIN DETAIL MODAL ========== -->
+  <div id="bin-detail-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="bin-detail-title"><i class="fa-solid fa-trash-can"></i> Bin Details</h3>
+        <i class="fa-solid fa-xmark close-btn" onclick="toggleModal('bin-detail-modal')"></i>
+      </div>
+      <div style="overflow-y:auto; max-height: 65vh;">
+        <!-- Status Row -->
+        <div style="padding: 15px 15px 0;">
+          <div id="bin-status-badge" class="status-badge-full full">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span id="bin-status-text">Bin Almost Full</span>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="bin-detail-grid">
+          <div class="bin-detail-stat">
+            <div class="label"><i class="fa-solid fa-chart-pie" style="color:#3498db;"></i> Fill Level</div>
+            <div class="value" id="detail-level" style="color: var(--primary-red);">85%</div>
+          </div>
+          <div class="bin-detail-stat">
+            <div class="label"><i class="fa-regular fa-clock" style="color:#ff9f43;"></i> Last Updated</div>
+            <div class="value" id="detail-time" style="font-size:13px; color:#ff9f43;">--:--</div>
+          </div>
+          <div class="bin-detail-stat">
+            <div class="label"><i class="fa-regular fa-calendar" style="color:#a29bfe;"></i> Date</div>
+            <div class="value" id="detail-date" style="font-size:13px; color:#a29bfe;">--/--/----</div>
+          </div>
+          <div class="bin-detail-stat">
+            <div class="label"><i class="fa-solid fa-wifi" style="color: var(--primary-green);"></i> Signal</div>
+            <div class="value" style="color: var(--primary-green); font-size: 13px;" id="detail-signal">Strong</div>
+          </div>
+          <div class="bin-detail-stat full-width">
+            <div class="label"><span class="gps-dot" id="detail-gps-dot"></span> Live GPS Location</div>
+            <div class="value" id="detail-location" style="font-size: 13px; color: #fff; font-weight: 400; margin-top:5px;">Fetching...</div>
+            <div class="map-coords" id="detail-coords">Coordinates loading...</div>
+          </div>
+        </div>
+
+<!-- Mini Map Placeholder (shows Google Maps link) -->
+<div class="bin-detail-map">
+  <div class="map-placeholder" id="detail-map-link" onclick="
+    var bin = binData[currentBinDetail];
+    var url;
+    if(bin.lat && bin.lng){
+      url = 'https://www.google.com/maps/search/?api=1&query=' + bin.lat + ',' + bin.lng;
+    } else {
+      url = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(bin.location);
+    }
+    window.location.href = url;
+  ">
+    <i class="fa-solid fa-map-location-dot"></i>
+    <div>Tap to view on Google Maps</div>
+    <div class="map-coords" id="detail-map-coords">Location: Loading...</div>
+  </div>
+</div>
+        <!-- Action Buttons -->
+        <div style="padding: 0 15px 15px; display: flex; gap: 10px;">
+          <button onclick="schedulePickup()" style="flex:1; background: rgba(46,213,115,0.1); border: 1px solid rgba(46,213,115,0.3); color: var(--primary-green); padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;">
+            <i class="fa-solid fa-truck"></i> Schedule Pickup
+          </button>
+          <button onclick="reportIssue()" style="flex:1; background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); color: var(--primary-red); padding: 12px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;">
+            <i class="fa-solid fa-flag"></i> Report Issue
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== LOGIN MODAL ========== -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-shield"></i> Admin Login</h3>
+        <i class="fa-solid fa-xmark close-btn" onclick="toggleModal('login-modal')"></i>
+      </div>
+      <div class="modal-body" id="login-body">
+        <div id="login-form-area">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="login-user" placeholder="Enter admin username">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-pass" placeholder="Enter password">
+          </div>
+          <div id="login-error" style="display:none;" class="form-error" style="margin-bottom:10px;"></div>
+          <button class="btn-submit" onclick="doLogin()">Login</button>
+          <p style="font-size:11px; color:var(--text-muted); text-align:center; margin-top:10px;">Default: admin / admin123</p>
+        </div>
+        <div id="login-success-area" style="display:none;">
+          <div class="form-success" style="margin-bottom:15px;"><i class="fa-solid fa-check-circle"></i> Logged in successfully!</div>
+          <div class="user-badge"><i class="fa-solid fa-user-shield"></i> <span id="logged-user-name">Admin</span> — Administrator</div>
+          <button class="btn-submit" style="background: rgba(255,71,87,0.2); border: 1px solid var(--primary-red); color: var(--primary-red);" onclick="doLogout()">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== CONTACT MODAL ========== -->
+  <div id="contact-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-headset"></i> Contact Support</h3>
+        <i class="fa-solid fa-xmark close-btn" onclick="toggleModal('contact-modal')"></i>
+      </div>
+      <div class="modal-body">
+        <div id="contact-form-area">
+          <div class="form-group">
+            <label>Your Name</label>
+            <input type="text" id="contact-name" placeholder="Enter your name">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="contact-email" placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label>Issue Type</label>
+            <select id="contact-type">
+              <option value="">Select issue type...</option>
+              <option>Bin not updating</option>
+              <option>GPS not working</option>
+              <option>Alert not received</option>
+              <option>Collection missed</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Message</label>
+            <textarea id="contact-msg" placeholder="Describe the issue..."></textarea>
+          </div>
+          <div id="contact-status" style="margin-bottom:10px; display:none;"></div>
+          <button class="btn-submit" id="contact-btn" onclick="submitContact()">
+            <i class="fa-solid fa-paper-plane"></i> Send Message
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+    <!-- ========== FEEDBACK MODAL ========== -->
+  <div id="feedback-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-comment-dots"></i> Send Feedback</h3>
+        <i class="fa-solid fa-xmark close-btn" onclick="toggleModal('feedback-modal')"></i>
+      </div>
+      <div class="modal-body">
+        <div id="feedback-form-area">
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 15px;">Rate your experience and help us improve.</p>
+          <!-- Star Rating -->
+          <div class="form-group">
+            <label>Overall Rating</label>
+            <div id="star-container" style="display: flex; gap: 8px; font-size: 28px; margin-top: 5px;">
+              <i class="fa-regular fa-star" data-val="1" onclick="setRating(1)" style="color:#ff9f43; cursor:pointer;"></i>
+              <i class="fa-regular fa-star" data-val="2" onclick="setRating(2)" style="color:#ff9f43; cursor:pointer;"></i>
+              <i class="fa-regular fa-star" data-val="3" onclick="setRating(3)" style="color:#ff9f43; cursor:pointer;"></i>
+              <i class="fa-regular fa-star" data-val="4" onclick="setRating(4)" style="color:#ff9f43; cursor:pointer;"></i>
+              <i class="fa-regular fa-star" data-val="5" onclick="setRating(5)" style="color:#ff9f43; cursor:pointer;"></i>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="fb-category">
+              <option>UI / Design</option>
+              <option>Performance</option>
+              <option>Alerts & Notifications</option>
+              <option>GPS / Location</option>
+              <option>General</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Your Feedback</label>
+            <textarea id="fb-msg" placeholder="Tell us what you think..."></textarea>
+          </div>
+          <div id="feedback-status" style="margin-bottom:10px; display:none;"></div>
+          <button class="btn-submit" id="fb-btn" onclick="submitFeedback()">
+            <i class="fa-solid fa-paper-plane"></i> Submit Feedback
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SYSTEM STATUS MODAL ========== -->
+  <div id="system-status-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-circle-info"></i> System Status</h3>
+        <i class="fa-solid fa-xmark close-btn" onclick="toggleModal('system-status-modal')"></i>
+      </div>
+      <div class="modal-body">
+        <div class="system-status-item">
+          <span><i class="fa-brands fa-firefox-browser" style="color:#ff9f43; margin-right:8px;"></i> Firebase Database</span>
+          <span class="dot-online" id="firebase-status">Connected</span>
+        </div>
+        <div class="system-status-item">
+          <span><i class="fa-solid fa-satellite-dish" style="color:#3498db; margin-right:8px;"></i> Bin 1 Sensor</span>
+          <span class="dot-online" id="sensor1-status">Online</span>
+        </div>
+        <div class="system-status-item">
+          <span><i class="fa-solid fa-satellite-dish" style="color:#3498db; margin-right:8px;"></i> Bin 2 Sensor</span>
+          <span class="dot-online" id="sensor2-status">Online</span>
+        </div>
+        <div class="system-status-item">
+          <span><i class="fa-solid fa-location-dot" style="color:var(--primary-green); margin-right:8px;"></i> GPS Module</span>
+          <span class="dot-online">Active</span>
+        </div>
+        <div class="system-status-item">
+          <span><i class="fa-regular fa-bell" style="color:#ff4757; margin-right:8px;"></i> Alert System</span>
+          <span class="dot-online">Running</span>
+        </div>
+        <div style="margin-top: 15px; padding: 12px; background: rgba(46,213,115,0.07); border-radius: 10px; border: 1px solid rgba(46,213,115,0.15); font-size: 12px; color: var(--text-muted);">
+          <i class="fa-solid fa-check-circle" style="color: var(--primary-green);"></i> All systems operational &nbsp;·&nbsp; Uptime: <span id="uptime-display">0m</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== PAGES ========== -->
+  <div id="history-page" class="page-section">
+    <h2><i class="fa-solid fa-clock-rotate-left"></i> Collection History</h2>
+    <div id="history-data">
+      <!-- Loaded from Firebase -->
+      <div class="empty-state" id="history-empty">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <p>No history yet. Pickup events will appear here.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-page" class="page-section">
+    <h2><i class="fa-solid fa-gear"></i> Settings</h2>
+    
+    <div id="settings-login-badge" style="display:none; margin-bottom:15px;">
+      <div class="user-badge"><i class="fa-solid fa-user-shield"></i> Logged in as: <span id="settings-user-name">Admin</span></div>
+    </div>
+
+    <div class="settings-group">
+      <h3>Account</h3>
+      <div class="settings-item" onclick="toggleModal('login-modal')">
+        <i class="fa-solid fa-user"></i> <span id="login-settings-label">Admin Login</span> <i class="fa-solid fa-chevron-right"></i>
+      </div>
+      <div class="settings-item" id="admin-panel-btn" style="display:none;" onclick="openAdminPage()">
+        <i class="fa-solid fa-user-shield" style="color:#ff9f43;"></i> <span style="color:#ff9f43; font-weight:600;">Open Admin Panel</span> <i class="fa-solid fa-chevron-right"></i>
+      </div>
+      <div class="settings-item">
+        <i class="fa-solid fa-bell"></i> <span>Live Notifications</span>
+        <label class="switch"><input type="checkbox" checked id="notif-toggle"><span class="slider"></span></label>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <h3>Support</h3>
+      <div class="settings-item" onclick="toggleModal('contact-modal')">
+        <i class="fa-solid fa-headset"></i> <span>Contact Support</span> <i class="fa-solid fa-chevron-right"></i>
+      </div>
+      <div class="settings-item" onclick="toggleModal('feedback-modal')">
+        <i class="fa-solid fa-comment-dots"></i> <span>Send Feedback</span> <i class="fa-solid fa-chevron-right"></i>
+      </div>
+      <div class="settings-item" onclick="toggleModal('system-status-modal')">
+        <i class="fa-solid fa-circle-info"></i> <span>System Status</span>
+        <span style="font-size:11px; color:var(--primary-green); background:rgba(46,213,115,0.1); padding:3px 8px; border-radius:8px;">Online</span>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <h3>About</h3>
+      <div class="settings-item">
+        <i class="fa-solid fa-code-branch"></i> <span>Version</span>
+        <span style="font-size:12px; color:var(--text-muted);">v2.0.0</span>
+      </div>
+      <div class="settings-item">
+        <i class="fa-brands fa-firebase"></i> <span>Firebase</span>
+        <span style="font-size:12px; color:var(--primary-green);" id="fb-conn-label">Connected</span>
+      </div>
+    </div>
+  </div>
+    <!-- ========== ADMIN PAGE ========== -->
+  <div id="admin-page" class="page-section" style="display:none;">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+      <button onclick="closeAdminPage()" style="background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:var(--text-muted); padding:8px 12px; border-radius:10px; cursor:pointer; font-size:13px;">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <h2 style="margin:0;"><i class="fa-solid fa-user-shield" style="color:#ff9f43;"></i> Admin Panel</h2>
+    </div>
+
+    <div class="user-badge" style="margin-bottom:20px;"><i class="fa-solid fa-user-shield"></i> Logged in as: <span id="admin-user-label">Admin</span></div>
+
+    <!-- Bin Control -->
+    <div class="settings-group">
+      <h3>Bin Level Override</h3>
+      <div style="padding:15px;">
+        <label style="font-size:12px; color:var(--text-muted);">Bin 1 — Set Level (%)</label>
+        <div style="display:flex; gap:10px; margin-top:8px;">
+          <input type="number" id="admin-bin1-level" min="0" max="100" placeholder="0-100"
+            style="flex:1; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:#fff; padding:10px 15px; border-radius:10px; font-size:14px; outline:none;">
+          <button onclick="adminSetLevel(1)" style="background:rgba(255,71,87,0.15); border:1px solid rgba(255,71,87,0.3); color:var(--primary-red); padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600;">
+            Set
+          </button>
+        </div>
+        <div style="margin-top:15px;">
+          <label style="font-size:12px; color:var(--text-muted);">Bin 2 — Set Level (%)</label>
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <input type="number" id="admin-bin2-level" min="0" max="100" placeholder="0-100"
+              style="flex:1; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:#fff; padding:10px 15px; border-radius:10px; font-size:14px; outline:none;">
+            <button onclick="adminSetLevel(2)" style="background:rgba(46,213,115,0.15); border:1px solid rgba(46,213,115,0.3); color:var(--primary-green); padding:10px 16px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:600;">
+              Set
+            </button>
+          </div>
+        </div>
+        <div id="admin-level-status" style="margin-top:10px; font-size:12px; display:none;"></div>
+      </div>
+    </div>
+
+    <!-- History Management -->
+    <div class="settings-group">
+      <h3>History Management</h3>
+      <div class="settings-item" onclick="adminClearHistory()" style="cursor:pointer;">
+        <i class="fa-solid fa-trash-can" style="color:var(--primary-red);"></i>
+        <span style="color:var(--primary-red);">Clear All History</span>
+        <i class="fa-solid fa-chevron-right"></i>
+      </div>
+      <div class="settings-item" onclick="adminAddHistory()" style="cursor:pointer;">
+        <i class="fa-solid fa-plus" style="color:var(--primary-green);"></i>
+        <span>Add Test Collection Event</span>
+        <i class="fa-solid fa-chevron-right"></i>
+      </div>
+    </div>
+
+    <!-- System Actions -->
+    <div class="settings-group">
+      <h3>System Actions</h3>
+      <div class="settings-item" onclick="adminClearNotifications()" style="cursor:pointer;">
+        <i class="fa-regular fa-bell" style="color:#ff9f43;"></i>
+        <span>Clear All Notifications</span>
+        <i class="fa-solid fa-chevron-right"></i>
+      </div>
+      <div class="settings-item" onclick="adminResetBins()" style="cursor:pointer;">
+        <i class="fa-solid fa-rotate-right" style="color:#3498db;"></i>
+        <span>Reset Both Bins to 0%</span>
+        <i class="fa-solid fa-chevron-right"></i>
+      </div>
+    </div>
+
+    <!-- Live Stats -->
+    <div class="settings-group">
+      <h3>Live Firebase Data</h3>
+      <div style="padding:15px; font-size:13px; color:var(--text-muted); line-height:2;">
+        <div>📦 Bin 1 Level: <span id="admin-live-bin1" style="color:#ff4757; font-weight:600;">--</span></div>
+        <div>📦 Bin 2 Level: <span id="admin-live-bin2" style="color:var(--primary-green); font-weight:600;">--</span></div>
+        <div>📍 Bin 1 Location: <span id="admin-live-loc1" style="color:#fff;">--</span></div>
+        <div>📍 Bin 2 Location: <span id="admin-live-loc2" style="color:#fff;">--</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== BOTTOM NAV ========== -->
+  <div class="bottom-nav">
+    <div class="nav-item active" data-target="dashboard-page">
+      <i class="fa-solid fa-house"></i>
+      <span>Dashboard</span>
+    </div>
+    <div class="nav-item" data-target="history-page">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+      <span>History</span>
+    </div>
+    <div class="nav-item" data-target="settings-page">
+      <i class="fa-solid fa-gear"></i>
+      <span>Settings</span>
+    </div>
+  </div>
+
+  <script>
+    // ========== FIREBASE SETUP ==========
+    var firebaseConfig = {
+      apiKey: "AIzaSyAE-UHAZUn2lcGVpmG1j9bGOvndnji88gA",
+      databaseURL: "https://trashiq-90c6e-default-rtdb.firebaseio.com"
+    };
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+    var db = firebase.database();
+
+    // ========== STATE ==========
+    var binData = {
+      1: { level: 85, location: "Sector 14 (Default)", lat: null, lng: null },
+      2: { level: 42, location: "Tech Park (Default)", lat: null, lng: null }
+    };
+    var currentBinDetail = 1;
+    var isLoggedIn = false;
+    var loggedUser = "";
+    var selectedRating = 0;
+    var startTime = Date.now();
+
+    // ========== CHART ==========
+    const ctx = document.getElementById('lineChart').getContext('2d');
+    const myChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+        datasets: [
+          {
+            label: 'Bin 1',
+            data: [35, 55, 70, 78, 85, 88, 78],
+            borderColor: '#ff4757',
+            backgroundColor: 'rgba(255,71,87,0.08)',
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 4,
+            fill: true
+          },
+          {
+            label: 'Bin 2',
+            data: [15, 25, 32, 40, 45, 48, 38],
+            borderColor: '#2ed573',
+            backgroundColor: 'rgba(46,213,115,0.08)',
+            tension: 0.4,
+            borderWidth: 2,
+            pointRadius: 4,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#8b9bb4', usePointStyle: true, boxWidth: 6 } } },
+        scales: {
+          y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8b9bb4' } },
+          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8b9bb4' } }
+        }
+      }
+    });
+
+    // ========== UPDATE BIN UI ==========
+    function updateBinStatus(binId, level) {
+      binData[binId].level = level;
+      document.getElementById(`perc${binId}`).textContent = level + "%";
+      document.getElementById(`lvl${binId}`).textContent = level + "%";
+      document.getElementById(`circle${binId}`).setAttribute('stroke-dasharray', `${level}, 100`);
+
+      // Sub text
+      let statusText = level >= 80 ? 'Full' : level >= 50 ? 'Moderate' : 'Low';
+      document.getElementById(`subperc${binId}`).textContent = statusText;
+
+      // Badge update
+      const badge = document.getElementById(`badge${binId}`);
+      if(level >= 80) {
+        badge.textContent = "Status: Full";
+        badge.className = "badge red";
+      } else {
+        badge.textContent = "Status: Normal";
+        badge.className = "badge green";
+      }
+
+      // Update card color class based on level
+      const card = document.querySelector(`.card[onclick="openBinDetail(${binId})"]`);
+      if(card) {
+        card.classList.remove('red', 'green');
+        card.classList.add(level >= 80 ? 'red' : 'green');
+      }
+
+      // Progress bar for both bins
+      const bar = document.getElementById(`bar${binId}`);
+      if(bar) {
+        bar.style.width = level + "%";
+        bar.style.background = level >= 80 ? 'var(--primary-red)' : 'var(--primary-green)';
+      }
+
+      // Warning label for Bin 1
+      if(binId === 1) {
+        const warn = document.getElementById('warn1');
+        if(warn) warn.style.display = level >= 80 ? 'inline-flex' : 'none';
+      }
+
+      calculateStats();
+    }
+
+    function calculateStats() {
+      let l1 = binData[1].level;
+      let l2 = binData[2].level;
+      document.getElementById('avg-fill').innerText = Math.round((l1 + l2) / 2) + "%";
+      let alerts = 0;
+      if (l1 > 80) alerts++;
+      if (l2 > 80) alerts++;
+      document.getElementById('alert-count').innerText = alerts;
+    }
+    // ========== FIREBASE LISTENERS ==========
+    db.ref("bins/bin1").on("value", s => { 
+      if(s.val()) updateBinStatus(1, s.val().level || 85); 
+    });
+    db.ref("bins/bin2").on("value", s => { 
+      if(s.val()) updateBinStatus(2, s.val().level || 42); 
+    });
+
+    db.ref("bins/bin1/location").on("value", s => { 
+      const loc = s.val() || "Sector 14 (Default)";
+      binData[1].location = loc;
+      document.getElementById('loc1').innerText = loc;
+    });
+    db.ref("bins/bin2/location").on("value", s => { 
+      const loc = s.val() || "Tech Park (Default)";
+      binData[2].location = loc;
+      document.getElementById('loc2').innerText = loc;
+    });
+
+    // GPS Coordinates from Firebase
+    db.ref("bins/bin1/lat").on("value", s => { if(s.val()) binData[1].lat = s.val(); });
+    db.ref("bins/bin1/lng").on("value", s => { if(s.val()) binData[1].lng = s.val(); });
+    db.ref("bins/bin2/lat").on("value", s => { if(s.val()) binData[2].lat = s.val(); });
+    db.ref("bins/bin2/lng").on("value", s => { if(s.val()) binData[2].lng = s.val(); });
+
+    // Live Notifications from Firebase
+    db.ref("notifications").limitToLast(5).on("child_added", s => {
+      const data = s.val();
+      if(data) {
+        const notiList = document.getElementById('noti-list');
+        const type = data.level > 80 ? 'warning' : '';
+        document.getElementById('bell-badge').style.display = 'block';
+        notiList.innerHTML = `<div class="noti-item ${type}">
+          <strong>${data.title || 'System Alert'}:</strong> ${data.message}
+          <br><small style="color:gray;">${new Date().toLocaleTimeString()}</small>
+        </div>` + notiList.innerHTML;
+      }
+    });
+
+    // Live History from Firebase
+    db.ref("history").limitToLast(10).on("child_added", s => {
+      const data = s.val();
+      if(data) {
+        const historyData = document.getElementById('history-data');
+        const emptyState = document.getElementById('history-empty');
+        if(emptyState) emptyState.remove();
+        const div = document.createElement('div');
+        div.className = 'history-card';
+        div.innerHTML = `
+          <div class="hist-icon"><i class="fa-solid fa-truck-ramp-box"></i></div>
+          <div class="hist-info">
+            <h4>${data.title || 'Collection Event'}</h4>
+            <p>${data.description || ''} · <span style="color: var(--primary-green);">${new Date(data.timestamp || Date.now()).toLocaleString()}</span></p>
+          </div>`;
+        historyData.prepend(div);
+      }
+    });
+
+    // ========== DATE & TIME ==========
+    function updateTime() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const dateStr = now.toLocaleDateString();
+      document.getElementById('time1').innerText = timeStr;
+      document.getElementById('date1').innerText = dateStr;
+      document.getElementById('time2').innerText = timeStr;
+      document.getElementById('date2').innerText = dateStr;
+      if(document.getElementById('detail-time')) {
+        document.getElementById('detail-time').innerText = timeStr;
+        document.getElementById('detail-date').innerText = dateStr;
+      }
+      // Uptime
+      const mins = Math.floor((Date.now() - startTime) / 60000);
+      const el = document.getElementById('uptime-display');
+      if(el) el.innerText = mins < 60 ? `${mins}m` : `${Math.floor(mins/60)}h ${mins%60}m`;
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+    // ========== NAVIGATION ==========
+    const navItems = document.querySelectorAll('.nav-item');
+    const pages = {
+      'dashboard-page': document.getElementById('dashboard-page'),
+      'history-page': document.getElementById('history-page'),
+      'settings-page': document.getElementById('settings-page')
+    };
+
+    navItems.forEach(item => {
+      item.addEventListener('click', () => {
+        navItems.forEach(n => n.classList.remove('active'));
+        item.classList.add('active');
+        Object.values(pages).forEach(page => page.style.display = 'none');
+        const target = item.getAttribute('data-target');
+        pages[target].style.display = 'block';
+      });
+    });
+
+    // ========== MODAL TOGGLE ==========
+    function toggleModal(modalId) {
+      const modal = document.getElementById(modalId);
+      const isOpen = modal.style.display === 'flex';
+      // Close all modals first
+      document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+      if(!isOpen) modal.style.display = 'flex';
+      if(modalId === 'notification-modal' && !isOpen) {
+        document.getElementById('bell-badge').style.display = 'none';
+      }
+    }
+
+    // Close modal on backdrop click
+    document.querySelectorAll('.modal').forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if(e.target === modal) modal.style.display = 'none';
+      });
+    });
+
+    // ========== BIN DETAIL ==========
+    function openBinDetail(binId) {
+      currentBinDetail = binId;
+      const bin = binData[binId];
+      const level = bin.level;
+
+      document.getElementById('bin-detail-title').innerHTML = `<i class="fa-solid fa-trash-can"></i> Bin ${binId} — Live Details`;
+      document.getElementById('detail-level').textContent = level + "%";
+      document.getElementById('detail-level').style.color = level >= 80 ? 'var(--primary-red)' : 'var(--primary-green)';
+// Status badge
+      const statusBadge = document.getElementById('bin-status-badge');
+      const statusText = document.getElementById('bin-status-text');
+      if(level >= 80) {
+        statusBadge.className = 'status-badge-full full';
+        statusText.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> &nbsp;Bin Almost Full — Pickup Required';
+      } else if(level >= 50) {
+        statusBadge.className = 'status-badge-full';
+        statusBadge.style.background = 'rgba(255,159,67,0.1)';
+        statusBadge.style.color = '#ff9f43';
+        statusBadge.style.border = '1px solid rgba(255,159,67,0.3)';
+        statusText.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> &nbsp;Bin Moderately Filled';
+      } else {
+        statusBadge.className = 'status-badge-full normal';
+        statusText.innerHTML = '<i class="fa-solid fa-check-circle"></i> &nbsp;Bin Level Normal';
+      }
+      // GPS dot color
+      const gpsDot = document.getElementById('detail-gps-dot');
+      gpsDot.className = level >= 80 ? 'gps-dot red' : 'gps-dot';
+
+      // Location
+      const locText = bin.location || "Fetching...";
+      document.getElementById('detail-location').textContent = locText;
+
+      if(bin.lat && bin.lng) {
+        document.getElementById('detail-coords').textContent = `${bin.lat}° N, ${bin.lng}° E`;
+        document.getElementById('detail-map-coords').textContent = `${bin.lat}, ${bin.lng}`;
+      } else {
+        document.getElementById('detail-coords').textContent = 'GPS coordinates loading from Firebase...';
+        document.getElementById('detail-map-coords').textContent = locText;
+      }
+
+      document.getElementById('detail-signal').textContent = 'Strong';
+      toggleModal('bin-detail-modal');
+    }
+
+    function openGoogleMaps() {
+      const bin = binData[currentBinDetail];
+      if(bin.lat && bin.lng) {
+        window.open(`https://maps.google.com/?q=${bin.lat},${bin.lng}`, '_blank');
+      } else {
+        window.open(`https://maps.google.com/?q=${encodeURIComponent(bin.location)}`, '_blank');
+      }
+    }
+
+    function schedulePickup() {
+      toggleModal('bin-detail-modal');
+      // Save to Firebase
+      db.ref("history").push({
+        title: `Bin ${currentBinDetail} Pickup Scheduled`,
+        description: `Pickup  via app`,
+        timestamp: Date.now()
+      });
+      addNotification(`Pickup scheduled for Bin ${currentBinDetail}`, false);
+      showToast('Pickup scheduled! Notification sent.');
+    }
+
+    function reportIssue() {
+      toggleModal('bin-detail-modal');
+      addNotification(`Issue reported for Bin ${currentBinDetail}`, true);
+      showToast('Issue reported to support team.', 'red');
+    }
+
+    // ========== LOGIN ==========
+    function doLogin() {
+      const user = document.getElementById('login-user').value.trim();
+      const pass = document.getElementById('login-pass').value.trim();
+      const errEl = document.getElementById('login-error');
+      if(user === 'admin' && pass === 'admin123') {
+        isLoggedIn = true;
+        loggedUser = user;
+        document.getElementById('login-form-area').style.display = 'none';
+        document.getElementById('login-success-area').style.display = 'block';
+        document.getElementById('logged-user-name').textContent = user.charAt(0).toUpperCase() + user.slice(1);
+        document.getElementById('login-settings-label').textContent = '✓ Logged in as ' + user;
+        document.getElementById('settings-login-badge').style.display = 'block';
+        document.getElementById('settings-user-name').textContent = user;
+        document.getElementById('admin-panel-btn').style.display = 'flex';
+        errEl.style.display = 'none';
+        toggleModal('login-modal');
+        showToast('Login successful! Admin Panel unlocked.', 'green');
+      } else {
+        errEl.textContent = 'Invalid credentials. Try admin / admin123';
+        errEl.style.display = 'block';
+      }
+    }
+
+    function doLogout() {
+      isLoggedIn = false;
+      loggedUser = "";
+      document.getElementById('login-form-area').style.display = 'block';
+      document.getElementById('login-success-area').style.display = 'none';
+      document.getElementById('login-user').value = '';
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-settings-label').textContent = 'Admin Login';
+      document.getElementById('settings-login-badge').style.display = 'none';
+      document.getElementById('admin-panel-btn').style.display = 'none';
+      // If on admin page, go back to settings
+      document.getElementById('admin-page').style.display = 'none';
+      document.getElementById('settings-page').style.display = 'block';
+      toggleModal('login-modal');
+    }
+
+    // ========== CONTACT FORM ==========
+    function submitContact() {
+      const name = document.getElementById('contact-name').value.trim();
+      const email = document.getElementById('contact-email').value.trim();
+      const type = document.getElementById('contact-type').value;
+      const msg = document.getElementById('contact-msg').value.trim();
+      const statusEl = document.getElementById('contact-status');
+      const btn = document.getElementById('contact-btn');
+
+      if(!name || !email || !type || !msg) {
+        statusEl.className = 'form-error';
+        statusEl.textContent = 'Please fill in all fields.';
+        statusEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      // Save to Firebase
+      db.ref("support_tickets").push({
+        name, email, type, message: msg, timestamp: Date.now()
+      }).then(() => {
+        statusEl.className = 'form-success';
+        statusEl.innerHTML = '<i class="fa-solid fa-check-circle"></i> Message sent! Support team will contact you soon.';
+        statusEl.style.display = 'block';
+        btn.style.display = 'none';
+        document.getElementById('contact-name').value = '';
+        document.getElementById('contact-email').value = '';
+        document.getElementById('contact-type').value = '';
+        document.getElementById('contact-msg').value = '';
+      }).catch(() => {
+        statusEl.className = 'form-error';
+        statusEl.textContent = 'Sent locally. Firebase sync pending.';
+        statusEl.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Message';
+      });
+    }
+
+    // ========== FEEDBACK FORM ==========
+    function setRating(val) {
+      selectedRating = val;
+      const stars = document.querySelectorAll('#star-container i');
+      stars.forEach((star, i) => {
+        star.className = i < val ? 'fa-solid fa-star' : 'fa-regular fa-star';
+        star.style.color = '#ff9f43';
+      });
+    }
+
+    function submitFeedback() {
+      const msg = document.getElementById('fb-msg').value.trim();
+      const category = document.getElementById('fb-category').value;
+      const statusEl = document.getElementById('feedback-status');
+      const btn = document.getElementById('fb-btn');
+
+      if(!msg || selectedRating === 0) {
+        statusEl.className = 'form-error';
+        statusEl.textContent = 'Please give a rating and write your feedback.';
+        statusEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      db.ref("feedback").push({
+        rating: selectedRating, category, message: msg, timestamp: Date.now()
+      }).then(() => {
+        statusEl.className = 'form-success';
+        statusEl.innerHTML = '<i class="fa-solid fa-heart"></i> Thank you for your feedback!';
+        statusEl.style.display = 'block';
+        btn.style.display = 'none';
+        document.getElementById('fb-msg').value = '';
+        setRating(0);
+      }).catch(() => {
+        statusEl.className = 'form-success';
+        statusEl.innerHTML = '<i class="fa-solid fa-heart"></i> Feedback received. Thank you!';
+        statusEl.style.display = 'block';
+        btn.style.display = 'none';
+      });
+    }
+
+    // ========== NOTIFICATIONS HELPER ==========
+    function addNotification(message, isWarning) {
+      const notiList = document.getElementById('noti-list');
+      document.getElementById('bell-badge').style.display = 'block';
+      const div = document.createElement('div');
+      div.className = 'noti-item' + (isWarning ? ' warning' : '');
+      div.innerHTML = `${message}<br><small style="color:gray;">${new Date().toLocaleTimeString()}</small>`;
+      notiList.prepend(div);
+    }
+
+    // ========== TOAST ==========
+    function showToast(msg, color) {
+      const toast = document.createElement('div');
+      toast.style.cssText = `position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:${color === 'red' ? 'rgba(255,71,87,0.9)' : 'rgba(46,213,115,0.9)'}; color:#fff; padding:12px 20px; border-radius:20px; font-size:13px; z-index:9999; backdrop-filter:blur(10px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); transition: opacity 0.4s;`;
+      toast.textContent = msg;
+      document.body.appendChild(toast);
+      setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 400); }, 2500);
+    }
+
+    // ========== ADMIN PAGE ==========
+    function openAdminPage() {
+      if(!isLoggedIn) { showToast('Please login first!', 'red'); return; }
+      // Hide all pages
+      Object.values(pages).forEach(p => p.style.display = 'none');
+      document.getElementById('admin-page').style.display = 'block';
+      // Update admin live stats
+      document.getElementById('admin-user-label').textContent = loggedUser.charAt(0).toUpperCase() + loggedUser.slice(1);
+      document.getElementById('admin-live-bin1').textContent = binData[1].level + '%';
+      document.getElementById('admin-live-bin2').textContent = binData[2].level + '%';
+      document.getElementById('admin-live-loc1').textContent = binData[1].location || '--';
+      document.getElementById('admin-live-loc2').textContent = binData[2].location || '--';
+    }
+
+    function closeAdminPage() {
+      document.getElementById('admin-page').style.display = 'none';
+      document.getElementById('settings-page').style.display = 'block';
+      // Reset nav active state
+      navItems.forEach(n => n.classList.remove('active'));
+      document.querySelector('[data-target="settings-page"]').classList.add('active');
+    }
+
+    function adminSetLevel(binId) {
+      const input = document.getElementById(`admin-bin${binId}-level`);
+      const val = parseInt(input.value);
+      const statusEl = document.getElementById('admin-level-status');
+      if(isNaN(val) || val < 0 || val > 100) {
+        statusEl.style.display = 'block';
+        statusEl.className = 'form-error';
+        statusEl.textContent = 'Please enter a valid value between 0 and 100.';
+        return;
+      }
+      // Update Firebase and UI
+      db.ref(`bins/bin${binId}/level`).set(val).then(() => {
+        updateBinStatus(binId, val);
+        statusEl.style.display = 'block';
+        statusEl.className = 'form-success';
+        statusEl.textContent = `✓ Bin ${binId} level set to ${val}%`;
+        document.getElementById(`admin-live-bin${binId}`).textContent = val + '%';
+        input.value = '';
+        addNotification(`Admin set Bin ${binId} level to ${val}%`, val >= 80);
+      }).catch(() => {
+        updateBinStatus(binId, val);
+        statusEl.style.display = 'block';
+        statusEl.className = 'form-success';
+        statusEl.textContent = `✓ Bin ${binId} level updated locally to ${val}%`;
+        document.getElementById(`admin-live-bin${binId}`).textContent = val + '%';
+        input.value = '';
+      });
+      setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+    }
+
+    function adminClearHistory() {
+      if(!confirm('Sari history delete karna chahte ho?')) return;
+      db.ref("history").remove().then(() => {
+        document.getElementById('history-data').innerHTML = `<div class="empty-state" id="history-empty"><i class="fa-solid fa-clock-rotate-left"></i><p>No history yet.</p></div>`;
+        showToast('History cleared!', 'green');
+      }).catch(() => {
+        document.getElementById('history-data').innerHTML = `<div class="empty-state" id="history-empty"><i class="fa-solid fa-clock-rotate-left"></i><p>No history yet.</p></div>`;
+        showToast('History cleared locally.', 'green');
+      });
+    }
+
+    function adminAddHistory() {
+      db.ref("history").push({
+        title: 'Test Collection Event',
+        description: 'Added by Admin',
+        timestamp: Date.now()
+      }).then(() => {
+        showToast('Test event added!', 'green');
+      }).catch(() => {
+        showToast('Added locally.', 'green');
+      });
+    }
+
+    function adminClearNotifications() {
+      document.getElementById('noti-list').innerHTML = '<div class="noti-item">Notifications cleared by Admin.</div>';
+      document.getElementById('bell-badge').style.display = 'none';
+      showToast('Notifications cleared!', 'green');
+    }
+
+    function adminResetBins() {
+      if(!confirm('Dono bins 0% pe reset karna chahte ho?')) return;
+      db.ref("bins/bin1/level").set(0);
+      db.ref("bins/bin2/level").set(0);
+      updateBinStatus(1, 0);
+      updateBinStatus(2, 0);
+      document.getElementById('admin-live-bin1').textContent = '0%';
+      document.getElementById('admin-live-bin2').textContent = '0%';
+      showToast('Both bins reset to 0%!', 'green');
+    }
+
+    // ========== INITIAL ==========
+    // Bin 1 Fixed Location
+// Bin 1 - PRMCEM Badnera Amravati
+binData[1].location = "PRMCEM, Badnera, Amravati";
+binData[1].lat = 20.8570552;
+binData[1].lng = 77.7504028;
+
+document.getElementById('loc1').innerText = "PRMCEM, Badnera, Amravati";
+
+// Firebase save
+db.ref("bins/bin1/location").set("PRMCEM, Badnera, Amravati");
+db.ref("bins/bin1/lat").set(20.8570552);
+db.ref("bins/bin1/lng").set(77.7504028);
+// Bin 2 - PRMITR Badnera Amravati
+binData[2].location = "PRMITR, Badnera, Amravati";
+binData[2].lat = "20.8546611";
+binData[2].lng = "77.7521753";
+document.getElementById('loc2').innerText = "PRMITR, Badnera, Amravati";
+db.ref("bins/bin2/location").set("PRMITR, Badnera, Amravati");
+db.ref("bins/bin2/lat").set("20.8546611");
+db.ref("bins/bin2/lng").set("77.7521753");
+    calculateStats();
+  </script>
+  <div style="text-align:center; padding:15px; font-size:12px; color:#8b9bb4; margin-bottom:80px;">
+  Made with ❤️ by <span style="color:#3498db; font-weight:600;">anu</span>
+</div>
+</body>
+</html>
